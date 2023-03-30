@@ -1,4 +1,4 @@
-use std::collections::{HashSet, HashMap};
+use std::collections::{HashSet};
 use rand::{seq::IteratorRandom};
 use md5::{Md5, Digest};
 
@@ -19,7 +19,7 @@ fn fill_pancakes(num_pancakes: usize) -> Vec<char> {
 
 fn flip_pancakes(pancakes: &mut [char], index: usize) {
     if pancakes.len() < 2 { return; }
-    pancakes[..index+1].reverse();
+    pancakes[..index].reverse();
 }
 
 fn is_pancake_sorted(pancakes: &[char]) -> bool {
@@ -38,56 +38,49 @@ fn hash_permutation(permutation: &[char]) -> String {
     format!("{:x}", hasher.finalize())
 }
 
-fn iddfs(permutacion_inicial: &[char]) -> Vec<char> {
-    let n = permutacion_inicial.len();
-    let mut permutacion_ordenada = permutacion_inicial.to_vec();
-    permutacion_ordenada.sort();
-    let mut depth_limit = 1; // profundidad máxima inicial
-    loop {
-        let mut visitados = HashSet::new();
-        visitados.insert(hash_permutation(permutacion_inicial));
-        let mut stack = Vec::new();
-        stack.push((permutacion_inicial.to_owned(), 0, 0));
-        let mut d = HashMap::<String, usize>::new();
-        let mut p = HashMap::<String, Vec<char>>::new();
-
-        let initial_permutation_hash = hash_permutation(permutacion_inicial);
-        d.insert(initial_permutation_hash.clone(), 0);
-        p.insert(initial_permutation_hash.clone(), permutacion_inicial.to_vec());
-
-        while let Some((permutacion, index, prev_level)) = stack.pop() {
-            let mut level: i32 = 0;
-            level = prev_level + 1;
-
-            if is_pancake_sorted(&permutacion) {
-                // si se encuentra la permutación ordenada, se detiene la búsqueda
-                println!("NÚMERO DE NODOS EXPANDIDOS: {}", visitados.len());
-                println!("NIVEL: {}", level);
-                println!("NÚMERO DE NODOS EN LA PILA: {}", stack.len());
-                println!("INDICE: {}", index);
-                return permutacion;
+fn iddfs_rec(pancakes: &mut [char], depth: usize, mut visited: &mut HashSet<String>) -> Option<Vec<char>> {
+    if depth == 0 {
+        return None;
+    }
+    if is_pancake_sorted(pancakes) {
+        return Some(pancakes.to_vec());
+    }
+    let n = pancakes.len();
+    let min_depth = depth;
+    let mut result = None;
+    for i in 2..=n {
+        flip_pancakes(pancakes, i);
+        let hash = hash_permutation(pancakes);
+        if let Some(_) = result {
+            if let Some(r) = iddfs_rec(pancakes, min_depth - 1, &mut visited) {
+                result = Some(r);
             }
-
-            if level >= depth_limit {
-                continue; // se detiene la búsqueda si se alcanza la profundidad máxima actual
-            }
-
-            for i in 2..=n {
-                let mut sucesor = permutacion.clone();
-                flip_pancakes(&mut sucesor, i - 1);
-                let sucesor_hash = hash_permutation(&sucesor);
-                if !visitados.contains(&sucesor_hash) {
-                    visitados.insert(sucesor_hash.clone());
-                    d.insert(sucesor_hash.clone(), d[&hash_permutation(&permutacion)] + 1);
-                    p.insert(sucesor_hash.clone(), permutacion.clone());
-                    stack.push((sucesor, i - 1, level));
+        } else {
+            if !visited.contains(&hash) {
+                visited.insert(hash.clone());
+                if let Some(r) = iddfs_rec(pancakes, depth - 1, &mut visited) {
+                    result = Some(r);
                 }
             }
         }
+        flip_pancakes(pancakes, i);
+    }
+    result
+}
 
-        depth_limit += 1; // aumenta la profundidad máxima para la siguiente iteración
+fn iddfs(pancakes: &mut [char]) -> Option<Vec<char>> {
+    let mut depth = 1;
+    loop {
+        let mut visited = HashSet::new();
+        visited.insert(hash_permutation(pancakes));
+        if let Some(result) = iddfs_rec(pancakes, depth, &mut visited) {
+            println!("Nodos Visitados: {:?}", visited.len());
+            return Some(result);
+        }
+        depth += 1;
     }
 }
+
 
 
 fn main() {
@@ -95,7 +88,11 @@ fn main() {
     println!("Ingrese el numero de caracteres de pancakes: ");
     std::io::stdin().read_line(&mut n).unwrap();
     let n = n.trim().parse::<usize>().unwrap();
-    let pancakes = fill_pancakes(n);
+    let mut pancakes = fill_pancakes(n);
     println!("Pancakes generados: {:?}", pancakes);
-    iddfs(&pancakes);
+    if let Some(result) = iddfs(&mut pancakes) {
+        println!("Pancakes despues de ordenar: {:?}", result);
+    } else {
+        println!("No se encontro una solución!");
+    }
 }
